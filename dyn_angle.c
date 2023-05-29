@@ -4,33 +4,13 @@
 
 /* Initilisation of parameters */
 
-// Surface properties
-
-typedef enum{HYDROPHILIC, HYDROPHOBIC, N_HYDRO_TYPES} HydroType;
-
 // Creating arrays for each parameter for the different wall types
 
-static double theta_ed_ar[N_HYDRO_TYPES] = {100.0, 100.0}; // Static contact angle
-static double mu_ar[N_HYDRO_TYPES] = {0.001003, 0.001003}; // Viscosity
-static double sigma_ar[N_HYDRO_TYPES] = {0.0728, 0.0728}; // Surface tension
-static double theta_a_ar[N_HYDRO_TYPES] = {105.0, 105.0}; // Advancing contact angle
-static double theta_r_ar[N_HYDRO_TYPES] = {95.0, 95.0}; //Receding contact angle
-
-HydroType get_hydro_type(Thread *ft)
-{
-    int i;
-    int n_hydrophilic = 1;
-    int hydrophilic_threads[] = {23};
-    int thread_id;
-
-    thread_id = THREAD_ID(ft);
-
-    for (i=0; i<n_hydrophilic; i++)
-        if (thread_id == hydrophilic_threads[i])
-            return HYDROPHILIC;
-    
-    return HYDROPHOBIC;
-}
+double theta_ed = 100.0; // Static contact angle
+double mu = 0.001003; // Viscosity
+double sigma = 0.0728; // Surface tension
+double theta_a = 105.0; // Advancing contact angle
+double theta_r = 95.0; //Receding contact angle
 
 // UDM Specification
 
@@ -50,18 +30,18 @@ enum{
     CONTACT_N_REQ_UDM
 };
 
-#define C_VOF_G_X(C, T)C_UDMI(C, T,VOF_G_X)
-#define C_VOF_G_Y(C, T)C_UDMI(C, T,VOF_G_Y)
-#define C_VOF_G_Z(C, T)C_UDMI(C, T,VOF_G_Z)
-#define C_VTFS(C, T)C_UDMI(C, T, VTFS)
-#define C_CONTACT_ANGLE(C, T)C_UDMI(C, T,CONTACT_ANGLE)
-#define C_REL_VEL_U(C, T)C_UDMI(C, T, REL_VEL_U)
-#define C_REL_VEL_V(C, T)C_UDMI(C, T, REL_VEL_V)
-#define C_REL_VEL_W(C, T)C_UDMI(C, T, REL_VEL_W)
-#define C_ucell (C, T)C_UDMI(C, T, C_ucell )
-#define C_lambda (C, T)C_UDMI(C, T, C_lambda )
-#define C_tw(C, T)C_UDMI(C, T, C_tw)
-#define C_nw(C, T)C_UDMI(C, T, C_nw)
+#define C_VOF_G_X(C, T) C_UDMI(C, T,VOF_G_X)
+#define C_VOF_G_Y(C, T) C_UDMI(C, T,VOF_G_Y)
+#define C_VOF_G_Z(C, T) C_UDMI(C, T,VOF_G_Z)
+#define C_VTFS(C, T) C_UDMI(C, T, VTFS)
+#define C_CONTACT_ANGLE(C, T) C_UDMI(C, T,CONTACT_ANGLE)
+#define C_REL_VEL_U(C, T) C_UDMI(C, T, REL_VEL_U)
+#define C_REL_VEL_V(C, T) C_UDMI(C, T, REL_VEL_V)
+#define C_REL_VEL_W(C, T) C_UDMI(C, T, REL_VEL_W)
+#define C_ucell(C, T) C_UDMI(C, T, C_ucell )
+#define C_lambda(C, T) C_UDMI(C, T, C_lambda )
+#define C_tw(C, T) C_UDMI(C, T, C_tw)
+#define C_nw(C, T) C_UDMI(C, T, C_nw)
 
 // Main DEFINE_ADJUST loop
 
@@ -74,14 +54,12 @@ DEFINE_ADJUST(dyn_angle, domain)
 
     double theta_n;
     real Vtfs, temp[ND_ND], vel_re[ND_ND], vof_n[ND_ND], vec_nw[ND_ND], vec_tw[ND_ND], vec_snw[ND_ND]; // simply declaring variables with ND_ND dimensions
-    real vec_ntw[ND_ND], vec_stw[ND_ND], A[ND_ND], Amag, Smag, u_cell[ND_ND], veltan[ND_ND];
-    double f_Hoff_inverse, x_hoff, Ca, gapp, xapp, lambda, theta_ed, mu, sigma, theta_a, theta_r;
+    real vec_ntw[ND_ND], vec_stw[ND_ND], A[ND_ND], Amag, u_cell[ND_ND], veltan[ND_ND];
+    double f_Hoff_inverse, x_hoff, Ca, lambda;
 
     int phase_domain_index = 1;
     Domain *pDomain = DOMAIN_SUB_DOMAIN(domain, phase_domain_index); /* selecting the index 1 secondary (water) phase, creates a pointer called pDomain which
     points to water by DOMAIN_SUB_DOMAIN. takes main domain and extracts specific phase. Hence, pDomain == water phase */
-
-    HydroType hydro_type;
 
     if(first_iteration) // calls only if first iteration, inbuilt ANSYS terminology
     {
@@ -127,18 +105,6 @@ DEFINE_ADJUST(dyn_angle, domain)
 
                 if (FLUID_THREAD_P(t0)) // fluid zone at wall
                 {
-                    // Setting contact angle parameters for the particular type of wall surface (hydrophilic or hydrophobic)
-
-                    HydroType hydro_type; // initiating hydro_type enum
-
-                    hydro_type = get_hydro_type(ft); // getting hydro type of face thread current
-
-                    theta_ed = theta_ed_ar[hydro_type]; // setting variables for contact angle to the wall type's parameters
-                    mu = mu_ar[hydro_type];
-                    sigma = sigma_ar[hydro_type];
-                    theta_a = theta_a_ar[hydro_type];
-                    theta_r = theta_r_ar[hydro_type];
-
                     // Looping through all faces in thread
 
                     begin_f_loop(f, ft)
@@ -248,18 +214,9 @@ DEFINE_ON_DEMAND(check_settings)
     Message0("\n");
     Message0("Model parameter values: \n");
     Message0("\n");
-    Message0("Hydrophilic: \n");
-    Message0("theta_ed = %e \n", theta_ed_ar[HYDROPHILIC]);
-    Message0("mu = %e \n", mu_ar[HYDROPHILIC]);
-    Message0("sigma = %e \n", sigma_ar[HYDROPHILIC]);
-    Message0("theta_a = %e \n", theta_a_ar[HYDROPHILIC]);
-    Message0("theta_r = %e \n", theta_r_ar[HYDROPHILIC]);
-    Message0("\n");
-    Message0("Hydrophobic: \n");
-    Message0("theta_ed = %e \n", theta_ed_ar[HYDROPHOBIC]);
-    Message0("mu = %e \n", mu_ar[HYDROPHOBIC]);
-    Message0("sigma = %e \n", sigma_ar[HYDROPHOBIC]);
-    Message0("theta_a = %e \n", theta_a_ar[HYDROPHOBIC]);
-    Message0("theta_r = %e \n", theta_r_ar[HYDROPHOBIC]);
-    Message0("\n");
+    Message0("theta_ed = %e \n", theta_ed);
+    Message0("mu = %e \n", mu);
+    Message0("sigma = %e \n", sigma);
+    Message0("theta_a = %e \n", theta_a);
+    Message0("theta_r = %e \n", theta_r);
 }
