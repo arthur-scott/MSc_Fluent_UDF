@@ -4,13 +4,13 @@
 
 /* Initilisation of parameters */
 
-// Creating arrays for each parameter for the different wall types
+// Values of parameters for experiment with water
 
-double theta_ed = 100.0; // Static contact angle
+double theta_ed = 120.0; // Static contact angle
 double mu = 0.001003; // Viscosity
 double sigma = 0.0728; // Surface tension
-double theta_a = 105.0; // Advancing contact angle
-double theta_r = 95.0; //Receding contact angle
+double theta_a = 125.0; // Advancing contact angle
+double theta_r = 115.0; //Receding contact angle
 
 // UDM Specification
 
@@ -23,10 +23,10 @@ enum{
     REL_VEL_U,
     REL_VEL_V,
     REL_VEL_W,
-    C_ucell ,
-    C_lambda ,
+    C_ucell,
+    C_lambda,
     C_nw,
-    C_tw ,
+    C_tw,
     CONTACT_N_REQ_UDM
 };
 
@@ -38,8 +38,8 @@ enum{
 #define C_REL_VEL_U(C, T) C_UDMI(C, T, REL_VEL_U)
 #define C_REL_VEL_V(C, T) C_UDMI(C, T, REL_VEL_V)
 #define C_REL_VEL_W(C, T) C_UDMI(C, T, REL_VEL_W)
+#define C_lambda(C, T) C_UDMI(C, T, C_lambda)
 #define C_ucell(C, T) C_UDMI(C, T, C_ucell )
-#define C_lambda(C, T) C_UDMI(C, T, C_lambda )
 #define C_tw(C, T) C_UDMI(C, T, C_tw)
 #define C_nw(C, T) C_UDMI(C, T, C_nw)
 
@@ -119,14 +119,16 @@ DEFINE_ADJUST(dyn_angle, domain)
                         Amag = NV_MAG(A);
                         NV_S(A, /=, Amag); // A holds outwards facing normal
 
-                        // Navier slip
+                        // Setting wall velocity
+
                         lambda = (C_VOLUME(c0, t0)/Amag)/2;
-                        NV_D(u_cell ,=, lambda*C_DUDX(c0, t0), lambda*C_DVDY(c0, t0), lambda*C_DWDZ(c0, t0));
+
+                        NV_D(u_cell ,=, C_U(c0, t0) + lambda*C_DUDX(c0, t0), C_V(c0, t0) + lambda*C_DVDY(c0, t0), C_W(c0, t0) + lambda*C_DWDZ(c0, t0));
 
                         C_lambda(c0, t0) = lambda;
                         C_ucell(c0, t0) = NV_MAG(u_cell);
 
-                        NV_D(vof_n ,=, C_VOF_G_X(c0, t0), C_VOF_G_Y(c0, t0), C_VOF_G_Z(c0, t0));
+                        NV_D(vof_n ,=, C_VOF_G_X(c0, t0), C_VOF_G_Y(c0, t0), C_VOF_G_Z(c0, t0)); // setting vof gradient from memory
 
                         // VoF along the wall
                         
@@ -142,11 +144,11 @@ DEFINE_ADJUST(dyn_angle, domain)
                         // Contact line direction
 
                         NV_CROSS(temp, u_cell, vec_nw); // takes cross product of u_cell and vec_nw, stores in temp
-                        NV_CROSS(veltan, vec_nw, temp); // takes cross product of vec_nw and temp, stores in veltan
+                        NV_CROSS(veltan, vec_nw, temp); // takes cross product of vec_nw and temp, stores in veltan as contact line velocity
 
                         // Receding contact angle
 
-                        if (NV_DOT(veltan, vof_n) > 0.0) // if dot product of tangential veloctity and ...
+                        if (NV_DOT(veltan, vof_n) > 0.0) // if dot product of tangential velocity and ...
                         {
                             Ca = mu*NV_MAG(veltan)/sigma; // capillary number
                             theta_n =  DEGREES(cbrt(CUB(RADIANS(theta_r)) - 72.0*Ca));
@@ -203,7 +205,6 @@ DEFINE_EXECUTE_AFTER_CASE(set_name, libname)
     Set_User_Memory_Name(REL_VEL_V, "VOF Gradient - x");
     Set_User_Memory_Name(REL_VEL_W, "VOF Gradient - x");
     Set_User_Memory_Name(C_ucell, "Magnitude of cell velocity");
-    Set_User_Memory_Name(C_lambda, "lambda");
     Set_User_Memory_Name(C_nw, "Magnitude of normal vector");
     Set_User_Memory_Name(C_tw, "Magnitude of tangential vector");
     Message0("Done. \n");
